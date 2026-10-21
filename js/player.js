@@ -9,60 +9,76 @@ export class PlayerShip {
         this.maxHealth = 100;
         this.boostEnergy = 100;
         this.speed = 0;
-        this.maxSpeed = 35;
+        this.maxSpeed = 42;
+        this.currentWeaponIndex = 0;
 
-        this.buildShipModel();
+        this.buildOrganicChromeShip();
         this.scene.add(this.mesh);
     }
 
-    buildShipModel() {
+    buildOrganicChromeShip() {
         const gameData = loadGameData();
         const shipType = gameData.equippedShip || 'VANGUARD-X';
 
-        // Procedural Sci-Fi Fighter Hull based on Class
-        let bodyColor = 0x00f0ff;
-        let wingColor = 0x112233;
+        // Ultra-Glossy Dark Chrome / Metallic Organic Shader Material
+        const chromeMaterial = new THREE.MeshStandardMaterial({
+            color: 0x111622,
+            roughness: 0.08,
+            metalness: 0.98,
+            emissive: 0x050b14
+        });
 
-        if (shipType === 'HEAVY-STRIKE') {
-            bodyColor = 0xff5500;
-            this.maxSpeed = 28;
-            this.maxHealth = 150;
-            this.health = 150;
-        } else if (shipType === 'STEALTH-PHANTOM') {
-            bodyColor = 0x9900ff;
-            this.maxSpeed = 42;
-            this.maxHealth = 80;
-            this.health = 80;
-        }
+        const glowingAccents = new THREE.MeshBasicMaterial({ color: 0x00f0ff });
 
-        const fuselageGeo = new THREE.ConeGeometry(1.2, 5, 4);
-        fuselageGeo.rotateX(Math.PI / 2);
-        const fuselageMat = new THREE.MeshStandardMaterial({ color: bodyColor, roughness: 0.3, metalness: 0.8 });
-        const fuselage = new THREE.Mesh(fuselageGeo, fuselageMat);
+        // 1. Sleek Organic Fuselage (Curved body resembling the image)
+        const bodyGeo = new THREE.ConeGeometry(1.4, 6.5, 8);
+        bodyGeo.rotateX(Math.PI / 2);
+        bodyGeo.scale(1, 0.7, 1);
+        const fuselage = new THREE.Mesh(bodyGeo, chromeMaterial);
         this.mesh.add(fuselage);
 
-        // Wings
-        const wingGeo = new THREE.BoxGeometry(5.5, 0.15, 2.2);
-        const wingMat = new THREE.MeshStandardMaterial({ color: wingColor, roughness: 0.4, metalness: 0.6 });
-        const wings = new THREE.Mesh(wingGeo, wingMat);
-        wings.position.set(0, 0, 0.5);
+        // 2. Flowing Swept-Back Organic Wings
+        const wingShape = new THREE.BoxGeometry(7.0, 0.1, 2.8);
+        const wings = new THREE.Mesh(wingShape, chromeMaterial);
+        wings.position.set(0, -0.1, 0.3);
+        wings.rotation.y = 0;
         this.mesh.add(wings);
 
-        // Cockpit Canopy (Emissive Cyan)
-        const cockpitGeo = new THREE.SphereGeometry(0.6, 16, 16);
-        cockpitGeo.scale(0.8, 0.6, 1.8);
-        const cockpitMat = new THREE.MeshStandardMaterial({ color: 0x00ffff, emissive: 0x0088ff, roughness: 0.1, metalness: 0.9, transparent: true, opacity: 0.85 });
-        const cockpit = new THREE.Mesh(cockpitGeo, cockpitMat);
-        cockpit.position.set(0, 0.5, 0.2);
-        this.mesh.add(cockpit);
+        // 3. Cockpit Glass Canopy (Reflective dark tint with cyan edge)
+        const canopyGeo = new THREE.SphereGeometry(0.6, 16, 16);
+        canopyGeo.scale(0.6, 0.4, 2.0);
+        const canopyMat = new THREE.MeshStandardMaterial({
+            color: 0x00d8ff,
+            roughness: 0.05,
+            metalness: 0.9,
+            transparent: true,
+            opacity: 0.85
+        });
+        const canopy = new THREE.Mesh(canopyGeo, canopyMat);
+        canopy.position.set(0, 0.4, -0.2);
+        this.mesh.add(canopy);
 
-        // Engine Thruster Glow
-        const engineGeo = new THREE.CylinderGeometry(0.4, 0.5, 1, 12);
+        // 4. Glowing Engine Exhaust Ports at the rear
+        const engineGeo = new THREE.CylinderGeometry(0.4, 0.5, 1.2, 12);
         engineGeo.rotateX(Math.PI / 2);
-        const engineMat = new THREE.MeshBasicMaterial({ color: 0x00f0ff });
-        const engine = new THREE.Mesh(engineGeo, engineMat);
-        engine.position.set(0, 0, 2.2);
-        this.mesh.add(engine);
+        const leftEngine = new THREE.Mesh(engineGeo, glowingAccents);
+        leftEngine.position.set(-0.6, 0, 2.8);
+        this.mesh.add(leftEngine);
+
+        const rightEngine = new THREE.Mesh(engineGeo, glowingAccents);
+        rightEngine.position.set(0.6, 0, 2.8);
+        this.mesh.add(rightEngine);
+
+        // Adjust stats based on class
+        if (shipType === 'HEAVY-STRIKE') {
+            this.maxSpeed = 32;
+            this.maxHealth = 160;
+            this.health = 160;
+        } else if (shipType === 'STEALTH-PHANTOM') {
+            this.maxSpeed = 50;
+            this.maxHealth = 85;
+            this.health = 85;
+        }
 
         this.mesh.position.set(0, 0, 0);
     }
@@ -72,38 +88,53 @@ export class PlayerShip {
         this.boostEnergy = 100;
         this.mesh.position.set(0, 0, 0);
         this.mesh.rotation.set(0, 0, 0);
+        this.currentWeaponIndex = 0;
     }
 
     update(dt, input, camera) {
-        const moveDir = input.getMovementVector(); // {x, y}
+        const moveDir = input.getMovementVector();
         
-        // Flight physics with banking and responsiveness
-        const targetRoll = -moveDir.x * 0.75;
-        const targetPitch = moveDir.y * 0.5;
-
-        this.mesh.rotation.z += (targetRoll - this.mesh.rotation.z) * 10 * dt;
-        this.mesh.rotation.x += (targetPitch - this.mesh.rotation.x) * 10 * dt;
-        this.mesh.rotation.y = -this.mesh.rotation.z * 0.6;
-
-        const isBoosting = input.isBoosting() && this.boostEnergy > 5;
-        const currentSpeed = isBoosting ? this.maxSpeed * 1.6 : this.maxSpeed;
-
-        if (isBoosting) {
-            this.boostEnergy = Math.max(0, this.boostEnergy - dt * 35);
-        } else {
-            this.boostEnergy = Math.min(100, this.boostEnergy + dt * 15);
+        if (input.isWeaponSwitchPressed()) {
+            this.currentWeaponIndex = (this.currentWeaponIndex + 1) % 4;
         }
 
-        // Move ship position within bounds
-        this.mesh.position.x += moveDir.x * currentSpeed * dt;
-        this.mesh.position.y += moveDir.y * currentSpeed * dt;
+        const targetRoll = -moveDir.x * 0.85;
+        const targetPitch = moveDir.y * 0.6;
 
-        this.mesh.position.x = Math.max(-35, Math.min(35, this.mesh.position.x));
-        this.mesh.position.y = Math.max(-22, Math.min(22, this.mesh.position.y));
+        this.mesh.rotation.z += (targetRoll - this.mesh.rotation.z) * 12 * dt;
+        this.mesh.rotation.x += (targetPitch - this.mesh.rotation.x) * 12 * dt;
+        this.mesh.rotation.y = -this.mesh.rotation.z * 0.5;
 
-        // Smooth cinematic camera follow
-        camera.position.x += (this.mesh.position.x * 0.4 - camera.position.x) * 5 * dt;
-        camera.position.y += ((this.mesh.position.y + 3) - camera.position.y) * 5 * dt;
-        camera.lookAt(this.mesh.position.clone().add(new THREE.Vector3(0, 0, -30)));
+        const isBoosting = input.isBoosting() && this.boostEnergy > 5;
+        const targetSpeed = isBoosting ? this.maxSpeed * 1.8 : this.maxSpeed;
+        
+        if (moveDir.x !== 0 || moveDir.y !== 0) {
+            this.speed += (targetSpeed - this.speed) * 7 * dt;
+        } else {
+            this.speed += (this.maxSpeed * 0.4 - this.speed) * 5 * dt;
+        }
+
+        if (isBoosting) {
+            this.boostEnergy = Math.max(0, this.boostEnergy - dt * 38);
+        } else {
+            this.boostEnergy = Math.min(100, this.boostEnergy + dt * 20);
+        }
+
+        this.mesh.position.x += moveDir.x * this.speed * dt;
+        this.mesh.position.y += moveDir.y * this.speed * dt;
+
+        this.mesh.position.x = Math.max(-42, Math.min(42, this.mesh.position.x));
+        this.mesh.position.y = Math.max(-26, Math.min(26, this.mesh.position.y));
+
+        const desiredCamX = this.mesh.position.x * 0.45;
+        const desiredCamY = (this.mesh.position.y + 3.0);
+        const desiredCamZ = this.mesh.position.z + 13.0;
+
+        camera.position.x += (desiredCamX - camera.position.x) * 9 * dt;
+        camera.position.y += (desiredCamY - camera.position.y) * 9 * dt;
+        camera.position.z += (desiredCamZ - camera.position.z) * 9 * dt;
+
+        camera.rotation.z = this.mesh.rotation.z * 0.15;
+        camera.lookAt(this.mesh.position.clone().add(new THREE.Vector3(0, 0, -35)));
     }
 }
