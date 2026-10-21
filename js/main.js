@@ -26,6 +26,10 @@ class Game {
         this.score = 0;
         this.currentMission = 1;
         this.missionState = { enemiesDefeated: 0, targetCount: 5 };
+        
+        // Fire cooldown tracking
+        this.fireCooldown = 0;
+        this.fireRateLimit = 0.15; // Seconds between shots
 
         this.input.setupTouchControls(this.container);
         this.initEventListeners();
@@ -136,8 +140,15 @@ class Game {
             this.weapons.update(dt);
             this.particles.update(dt);
 
-            if (this.input.isFiring()) {
+            // Update fire cooldown timer
+            if (this.fireCooldown > 0) {
+                this.fireCooldown -= dt;
+            }
+
+            // Fire weapon with cooldown control
+            if (this.input.isFiring() && this.fireCooldown <= 0) {
                 this.weapons.fire(this.player.mesh.position.clone().add(new THREE.Vector3(0, 0, -2)), new THREE.Vector3(0, 0, -1));
+                this.fireCooldown = this.fireRateLimit;
             }
 
             if (this.currentMission === 3) {
