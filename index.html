@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>COSMIC STRIKE — DEEP SPACE</title>
+    <title>COSMIC STRIKE — SINGULARITY</title>
     <link rel="stylesheet" href="css/style.css">
     <!-- Import Three.js and Addons via ES Module CDN -->
     <script type="importmap">
@@ -21,16 +21,25 @@
 
     <!-- UI Overlay Layers -->
     <div id="ui-container">
+        <!-- Cinematic Intro Overlay -->
+        <div id="cinematic-intro" class="screen">
+            <div class="intro-content">
+                <h2 class="sub-title">SECTOR HORIZON — UNKNOWN SPACE</h2>
+                <h1 class="glitch" data-text="SINGULARITY APPROACHING">SINGULARITY APPROACHING</h1>
+                <p>Gravitational anomaly detected. Capital warships inbound.</p>
+                <button id="btn-skip-intro" class="btn primary">SKIP INTRO</button>
+            </div>
+        </div>
+
         <!-- Main Menu -->
-        <div id="main-menu" class="screen active">
+        <div id="main-menu" class="screen">
             <div class="title-container">
                 <h1 class="glitch" data-text="COSMIC STRIKE">COSMIC STRIKE</h1>
-                <h2>DEEP SPACE</h2>
+                <h2>SINGULARITY</h2>
             </div>
             <div class="menu-buttons">
                 <button id="btn-start" class="btn primary">START CAMPAIGN</button>
-                <button id="btn-continue" class="btn secondary" style="display:none;">CONTINUE</button>
-                <button id="btn-hangar" class="btn secondary">HANGAR</button>
+                <button id="btn-hangar" class="btn secondary">HANGAR & SHIPS</button>
                 <button id="btn-settings" class="btn secondary">SETTINGS</button>
                 <button id="btn-controls" class="btn secondary">CONTROLS</button>
                 <button id="btn-credits" class="btn secondary">CREDITS</button>
@@ -40,11 +49,11 @@
         <!-- Mission Briefing Screen -->
         <div id="mission-briefing" class="screen">
             <div class="panel">
-                <h2 id="briefing-title">MISSION 1: FIRST CONTACT</h2>
-                <p id="briefing-desc">Engage enemy scout units and master your interceptor controls in deep space sector Alpha.</p>
+                <h2 id="briefing-title">MISSION 1: EVENT HORIZON</h2>
+                <p id="briefing-desc">Engage hostile scout wings near the accretion disk and secure the sector.</p>
                 <div class="briefing-stats">
-                    <span>OBJECTIVE: Destroy all enemy scouts</span>
-                    <span>THREAT LEVEL: LOW</span>
+                    <span>OBJECTIVE: Destroy all enemy interceptors</span>
+                    <span>THREAT LEVEL: EXTREME</span>
                 </div>
                 <button id="btn-launch" class="btn primary">LAUNCH MISSION</button>
                 <button id="btn-back-menu" class="btn secondary">BACK TO MENU</button>
@@ -55,31 +64,31 @@
         <div id="game-hud" class="hud" style="display:none;">
             <div class="hud-top">
                 <div class="hud-box">
-                    <span class="label">SHIELD</span>
+                    <span class="label">SHIELD INTEGRITY</span>
                     <div class="bar-container"><div id="shield-bar" class="bar blue"></div></div>
                 </div>
                 <div class="hud-box score-box">
-                    <span class="label">SCORE</span>
+                    <span class="label">TACTICAL SCORE</span>
                     <span id="hud-score">000000</span>
                 </div>
                 <div class="hud-box">
-                    <span class="label">BOOST</span>
+                    <span class="label">AFTERBURNER</span>
                     <div class="bar-container"><div id="boost-bar" class="bar cyan"></div></div>
                 </div>
             </div>
             <div class="hud-center">
                 <div id="crosshair"></div>
                 <div id="boss-hud" style="display:none;">
-                    <span id="boss-name">DREADNOUGHT BOSS</span>
+                    <span id="boss-name">SINGULARITY DREADNOUGHT</span>
                     <div class="bar-container boss-bar-container"><div id="boss-health-bar" class="bar red"></div></div>
                 </div>
             </div>
             <div class="hud-bottom">
                 <div class="mission-objective">
-                    <span id="objective-text">Objective: Clear Sector (0/5)</span>
+                    <span id="objective-text">Objective: Eliminate Hostiles (0/5)</span>
                 </div>
                 <div class="weapon-status">
-                    <span id="weapon-name">ENERGY CANNON</span>
+                    <span id="weapon-name">PLASMA BLASTER MK.II</span>
                     <span id="ammo-status">INFINITE</span>
                 </div>
             </div>
@@ -89,33 +98,33 @@
         <!-- Pause Menu -->
         <div id="pause-menu" class="screen">
             <div class="panel">
-                <h2>PAUSED</h2>
-                <button id="btn-resume" class="btn primary">RESUME</button>
+                <h2>TACTICAL PAUSE</h2>
+                <button id="btn-resume" class="btn primary">RESUME COMBAT</button>
                 <button id="btn-restart" class="btn secondary">RESTART MISSION</button>
-                <button id="btn-quit" class="btn secondary">QUIT TO MENU</button>
+                <button id="btn-quit" class="btn secondary">ABORT TO MENU</button>
             </div>
         </div>
 
         <!-- Hangar Screen -->
         <div id="hangar-screen" class="screen">
             <div class="panel wide">
-                <h2>HANGAR & UPGRADES</h2>
+                <h2>ADVANCED FLEET HANGAR</h2>
                 <div class="hangar-layout">
                     <div class="ship-selector">
-                        <h3>INTERCEPTOR FLEET</h3>
-                        <div id="ship-list"></div>
+                        <h3>SELECT INTERCEPTOR</h3>
+                        <div id="ship-list" class="ship-list-grid">
+                            <button class="ship-card active" data-ship="VANGUARD-X">Vanguard-X (Agile)</button>
+                            <button class="ship-card" data-ship="HEAVY-STRIKE">Titan Heavy (Armored)</button>
+                            <button class="ship-card" data-ship="STEALTH-PHANTOM">Phantom X (Experimental)</button>
+                        </div>
                     </div>
                     <div class="ship-details">
-                        <h3 id="selected-ship-name">VANGUARD-X</h3>
-                        <p id="selected-ship-desc">Standard agile space interceptor equipped with dual blasters.</p>
+                        <h3 id="selected-ship-name">VANGUARD-X INTERCEPTOR</h3>
+                        <p id="selected-ship-desc">High-speed dogfighter designed for rapid sector strikes.</p>
                         <div class="upgrade-stats">
                             <div><span>Hull Integrity:</span> <span id="stat-hull">100</span></div>
-                            <div><span>Weapon Power:</span> <span id="stat-weapon">1.0x</span></div>
+                            <div><span>Weapon Output:</span> <span id="stat-weapon">1.2x</span></div>
                             <div><span>Boost Capacity:</span> <span id="stat-boost">100%</span></div>
-                        </div>
-                        <div class="upgrade-buttons">
-                            <button id="btn-upgrade-hull" class="btn small">UPGRADE HULL (500 CR)</button>
-                            <button id="btn-upgrade-weapon" class="btn small">UPGRADE WEAPON (750 CR)</button>
                         </div>
                         <span class="credits-display">CREDITS: <span id="player-credits">1000</span> CR</span>
                     </div>
@@ -127,17 +136,16 @@
         <!-- Settings Screen -->
         <div id="settings-screen" class="screen">
             <div class="panel">
-                <h2>SETTINGS</h2>
+                <h2>SYSTEM SETTINGS</h2>
                 <div class="setting-row">
-                    <label>Graphics Quality:</label>
+                    <label>Cinematic Quality:</label>
                     <select id="setting-quality">
-                        <option value="low">Low (Performance)</option>
-                        <option value="medium" selected>Medium (Balanced)</option>
-                        <option value="high">High (Cinematic)</option>
+                        <option value="medium" selected>Ultra Cinematic</option>
+                        <option value="high">High Performance</option>
                     </select>
                 </div>
                 <div class="setting-row">
-                    <label>Master Volume:</label>
+                    <label>Master Audio Volume:</label>
                     <input type="range" id="setting-volume" min="0" max="1" step="0.1" value="0.7">
                 </div>
                 <button id="btn-settings-back" class="btn secondary">BACK TO MENU</button>
@@ -147,14 +155,13 @@
         <!-- Controls Screen -->
         <div id="controls-screen" class="screen">
             <div class="panel">
-                <h2>CONTROLS</h2>
+                <h2>PILOT CONTROLS</h2>
                 <div class="controls-grid">
-                    <div><strong>Movement:</strong> WASD / Arrow Keys</div>
+                    <div><strong>Flight Direction:</strong> WASD / Arrow Keys</div>
                     <div><strong>Fire Weapon:</strong> Spacebar or Left Click</div>
-                    <div><strong>Boost:</strong> Shift Key</div>
-                    <div><strong>Secondary / Missiles:</strong> Q or E</div>
-                    <div><strong>Pause:</strong> Escape</div>
-                    <div><strong>Mobile:</strong> On-screen Virtual Joystick & Buttons</div>
+                    <div><strong>Afterburner Boost:</strong> Shift Key</div>
+                    <div><strong>Tactical Pause:</strong> Escape Key</div>
+                    <div><strong>Mobile Pilots:</strong> On-screen Virtual Joystick & Touch Fire</div>
                 </div>
                 <button id="btn-controls-back" class="btn secondary">BACK TO MENU</button>
             </div>
@@ -164,9 +171,8 @@
         <div id="credits-screen" class="screen">
             <div class="panel">
                 <h2>CREDITS</h2>
-                <p><strong>COSMIC STRIKE: DEEP SPACE</strong></p>
-                <p>A Premium Cinematic 3D Space Shooter built with Three.js & HTML5.</p>
-                <p>Designed for GitHub Pages.</p>
+                <p><strong>COSMIC STRIKE: SINGULARITY</strong></p>
+                <p>Hollywood-Style Cinematic 3D Space Combat Experience.</p>
                 <button id="btn-credits-back" class="btn secondary">BACK TO MENU</button>
             </div>
         </div>
@@ -174,12 +180,12 @@
         <!-- Mission Success Screen -->
         <div id="success-screen" class="screen">
             <div class="panel">
-                <h2 id="success-title">MISSION COMPLETED</h2>
+                <h2>SECTOR SECURED</h2>
                 <div class="score-summary">
-                    <p>Score: <span id="summary-score">0</span></p>
-                    <p>Credits Earned: +<span id="summary-credits">250</span> CR</p>
+                    <p>Tactical Score: <span id="summary-score">0</span></p>
+                    <p>Credits Acquired: +<span id="summary-credits">350</span> CR</p>
                 </div>
-                <button id="btn-next-mission" class="btn primary">NEXT MISSION</button>
+                <button id="btn-next-mission" class="btn primary">NEXT SECTOR</button>
                 <button id="btn-success-menu" class="btn secondary">MAIN MENU</button>
             </div>
         </div>
@@ -187,9 +193,9 @@
         <!-- Mission Failure Screen -->
         <div id="failure-screen" class="screen">
             <div class="panel">
-                <h2>MISSION FAILED</h2>
-                <p>Your ship was destroyed in action.</p>
-                <button id="btn-retry" class="btn primary">RETRY MISSION</button>
+                <h2>HULL BREACH — DESTROYED</h2>
+                <p>Your vessel succumbed to gravitational hostile fire.</p>
+                <button id="btn-retry" class="btn primary">RE-ENGAGE SECTOR</button>
                 <button id="btn-failure-menu" class="btn secondary">MAIN MENU</button>
             </div>
         </div>
