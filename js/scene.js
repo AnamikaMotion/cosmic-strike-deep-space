@@ -4,9 +4,9 @@ export class SpaceScene {
     constructor(container) {
         this.container = container;
         this.scene = new THREE.Scene();
-        this.scene.fog = new THREE.FogExp2(0x010206, 0.0006);
+        this.scene.fog = new THREE.FogExp2(0x020815, 0.0005);
 
-        this.camera = new THREE.PerspectiveCamera(65, window.innerWidth / window.innerHeight, 0.1, 5000);
+        this.camera = new THREE.PerspectiveCamera(65, window.innerWidth / window.innerHeight, 0.1, 6000);
         this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
         this.renderer.setSize(window.innerWidth, window.innerHeight);
         this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -17,29 +17,29 @@ export class SpaceScene {
 
         this.initLighting();
         this.initEnvironment();
-        this.initBlackHole();
-        this.initEnvironmentalStorytelling();
+        this.initPlanetsAndAsteroidBelt();
 
         window.addEventListener('resize', () => this.onWindowResize());
     }
 
     initLighting() {
-        const ambient = new THREE.AmbientLight(0x0c1428, 2.5);
+        const ambient = new THREE.AmbientLight(0x112244, 2.5);
         this.scene.add(ambient);
 
-        const sun = new THREE.DirectionalLight(0xffeedd, 3.2);
-        sun.position.set(400, 500, 400);
+        // Bright Star Flare Light matching the image
+        const sun = new THREE.DirectionalLight(0xccffff, 3.5);
+        sun.position.set(-500, 300, -800);
         this.scene.add(sun);
     }
 
     initEnvironment() {
-        // Multi-layered realistic starfield
+        // Starfield
         const starGeo = new THREE.BufferGeometry();
         const starCount = 5000;
         const posArray = new Float32Array(starCount * 3);
 
         for (let i = 0; i < starCount * 3; i++) {
-            posArray[i] = (Math.random() - 0.5) * 4000;
+            posArray[i] = (Math.random() - 0.5) * 5000;
         }
 
         starGeo.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
@@ -47,71 +47,72 @@ export class SpaceScene {
         this.starField = new THREE.Points(starGeo, starMat);
         this.scene.add(this.starField);
 
-        // Volumetric Nebula Background
-        const nebulaGeo = new THREE.SphereGeometry(2000, 32, 32);
+        // Deep Cyan-Blue Nebula Glow Background
+        const nebulaGeo = new THREE.SphereGeometry(2500, 32, 32);
         const nebulaMat = new THREE.MeshBasicMaterial({
-            color: 0x1b003a,
+            color: 0x0a1a3a,
             side: THREE.BackSide,
             transparent: true,
-            opacity: 0.55
+            opacity: 0.6
         });
         const nebula = new THREE.Mesh(nebulaGeo, nebulaMat);
         this.scene.add(nebula);
     }
 
-    initBlackHole() {
-        this.blackHoleGroup = new THREE.Group();
-        this.blackHoleGroup.position.set(0, 100, -1500);
+    initPlanetsAndAsteroidBelt() {
+        this.planetGroup = new THREE.Group();
 
-        // Pitch Black Event Horizon Core
-        const coreGeo = new THREE.SphereGeometry(120, 32, 32);
-        const coreMat = new THREE.MeshBasicMaterial({ color: 0x000000 });
-        const core = new THREE.Mesh(coreGeo, coreMat);
-        this.blackHoleGroup.add(core);
+        // 1. Giant Planet with Atmosphere Glow in background
+        const planetGeo = new THREE.SphereGeometry(350, 64, 64);
+        const planetMat = new THREE.MeshStandardMaterial({
+            color: 0x224466,
+            roughness: 0.8,
+            metalness: 0.2
+        });
+        const planet = new THREE.Mesh(planetGeo, planetMat);
+        planet.position.set(600, 250, -2000);
+        this.planetGroup.add(planet);
 
-        // Glowing Accretion Disk
-        const diskGeo = new THREE.RingGeometry(140, 420, 64);
-        diskGeo.rotateX(Math.PI / 2);
-        const diskMat = new THREE.MeshBasicMaterial({
-            color: 0xff7700,
+        // Planet Atmosphere Ring
+        const atmosGeo = new THREE.RingGeometry(355, 420, 64);
+        atmosGeo.rotateX(Math.PI / 3);
+        const atmosMat = new THREE.MeshBasicMaterial({
+            color: 0x00aaff,
             side: THREE.DoubleSide,
             transparent: true,
-            opacity: 0.92
+            opacity: 0.35
         });
-        this.accretionDisk = new THREE.Mesh(diskGeo, diskMat);
-        this.blackHoleGroup.add(this.accretionDisk);
+        const ring = new THREE.Mesh(atmosGeo, atmosMat);
+        ring.position.copy(planet.position);
+        this.planetGroup.add(ring);
 
-        // Outer Plasma Ring
-        const outerDiskGeo = new THREE.RingGeometry(430, 700, 64);
-        outerDiskGeo.rotateX(Math.PI / 2);
-        const outerDiskMat = new THREE.MeshBasicMaterial({
-            color: 0xff0066,
-            side: THREE.DoubleSide,
-            transparent: true,
-            opacity: 0.5
-        });
-        this.outerDisk = new THREE.Mesh(outerDiskGeo, outerDiskMat);
-        this.blackHoleGroup.add(this.outerDisk);
+        // 2. Distant Moon
+        const moonGeo = new THREE.SphereGeometry(80, 32, 32);
+        const moonMat = new THREE.MeshStandardMaterial({ color: 0x556677, roughness: 0.9 });
+        const moon = new THREE.Mesh(moonGeo, moonMat);
+        moon.position.set(-700, 400, -2500);
+        this.planetGroup.add(moon);
 
-        this.scene.add(this.blackHoleGroup);
-    }
+        // 3. Dense Asteroid Belt Field (Matching the image's floating rock belt)
+        this.asteroidBelt = new THREE.Group();
+        const rockGeo = new THREE.DodecahedronGeometry(14, 1);
+        const rockMat = new THREE.MeshStandardMaterial({ color: 0x3a4555, roughness: 0.9, metalness: 0.3 });
 
-    initEnvironmentalStorytelling() {
-        this.debrisGroup = new THREE.Group();
-        const rockGeo = new THREE.DodecahedronGeometry(15, 1);
-        const rockMat = new THREE.MeshStandardMaterial({ color: 0x334455, roughness: 0.8, metalness: 0.4 });
-
-        for (let i = 0; i < 30; i++) {
-            const mesh = new THREE.Mesh(rockGeo, rockMat);
-            mesh.position.set(
-                (Math.random() - 0.5) * 800,
-                (Math.random() - 0.5) * 400,
-                -300 - Math.random() * 1000
+        for (let i = 0; i < 70; i++) {
+            const rock = new THREE.Mesh(rockGeo, rockMat);
+            const angle = (i / 70) * Math.PI * 2;
+            const radius = 300 + Math.random() * 250;
+            rock.position.set(
+                Math.cos(angle) * radius,
+                (Math.random() - 0.5) * 120,
+                Math.sin(angle) * radius - 800
             );
-            mesh.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, 0);
-            this.debrisGroup.add(mesh);
+            rock.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, 0);
+            this.asteroidBelt.add(rock);
         }
-        this.scene.add(this.debrisGroup);
+
+        this.planetGroup.add(this.asteroidBelt);
+        this.scene.add(this.planetGroup);
     }
 
     addCameraShake(amount) {
@@ -119,9 +120,8 @@ export class SpaceScene {
     }
 
     update(dt) {
-        if (this.accretionDisk) this.accretionDisk.rotation.z += dt * 0.4;
-        if (this.outerDisk) this.outerDisk.rotation.z -= dt * 0.25;
-        if (this.starField) this.starField.rotation.y += dt * 0.005;
+        if (this.starField) this.starField.rotation.y += dt * 0.003;
+        if (this.asteroidBelt) this.asteroidBelt.rotation.y += dt * 0.02;
 
         if (this.shakeIntensity > 0) {
             this.shakeIntensity = Math.max(0, this.shakeIntensity - dt * this.shakeDecay);
