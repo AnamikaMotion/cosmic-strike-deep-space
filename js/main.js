@@ -1,227 +1,279 @@
-import { SpaceScene } from './scene.js';
-import { PlayerShip } from './player.js';
+import * as THREE from 'three';
+import { createSceneSetup } from './scene.js';
+import { createPlayerShip } from './player.js';
+import { initInput, input } from './input.js';
 import { WeaponSystem } from './weapons.js';
-import { EnemyManager } from './enemies.js';
-import { Boss } from './boss.js';
+import { createEnemyMesh } from './enemies.js';
+import { createBossMesh } from './boss.js';
 import { ParticleSystem } from './particles.js';
-import { InputManager } from './input.js';
-import { UIManager } from './ui.js';
-import { audioManager } from './audio.js';
-import { loadGameData, saveGameData } from './storage.js';
+import { initAudio, playSound, setMasterVolume } from './audio.js';
+import { loadGameData, saveGameData, resetGameData } from './storage.js';
+import { showScreen, updateHUD } from './ui.js';
 
-class Game {
-    constructor() {
-        this.container = document.getElementById('canvas-container');
-        this.spaceScene = new SpaceScene(this.container);
-        this.input = new InputManager();
-        this.ui = new UIManager();
-        this.weapons = new WeaponSystem(this.spaceScene.scene);
-        this.particles = new ParticleSystem(this.spaceScene.scene);
-        this.player = new PlayerShip(this.spaceScene.scene);
-        this.enemies = new EnemyManager(this.spaceScene.scene, this.weapons);
-        this.boss = new Boss(this.spaceScene.scene);
+let saveData = loadGameData();
+initAudio(saveData.settings.volume);
+initInput();
 
-        this.gameData = loadGameData();
-        this.state = 'MENU';
-        this.score = 0;
-        this.currentMission = 1;
-        this.missionState = { enemiesDefeated: 0, targetCount: 5 };
-        
-        // Fire cooldown tracking
-        this.fireCooldown = 0;
-        this.fireRateLimit = 0.15; // Seconds between shots
+const { scene, camera, renderer } = createSceneSetup();
+const weapons = new WeaponSystem(scene);
+const particles = new ParticleSystem(scene);
+const player = createPlayerShip();
+scene.add(player);
 
-        this.input.setupTouchControls(this.container);
-        this.initEventListeners();
-        this.loop = this.loop.bind(this);
-        requestAnimationFrame(this.loop);
+let gameState = 'MENU'; // MENU, BRIEFING, PLAYING, PAUSED, RESULT
+let currentMission = 1;
+let score = 0;
+let shield = 100;
+let boost = 100;
+let enemies = [];
+let boss = null;
+let bossHP = 100;
+
+// UI Event Handlers
+document.getElementById('btn-start').addEventListener('click', () => {
+    currentMission = 1;
+    setupBriefing();
+});
+document.getElementById('btn-continue').addEventListener('click', () => {
+    currentMission = saveData.unlockedMission;
+    setupBriefing();
+});
+document.getElementById('btn-hangar').addEventListener('click', () => showScreen('hangar-screen'));
+document.getElementById('btn-settings').addEventListener('click', () => showScreen('settings-screen'));
+document.getElementById('btn-credits').addEventListener('click', () => showScreen('credits-screen'));
+
+document.getElementById('btn-back-menu').addEventListener('click', () => showScreen('main-menu'));
+document.getElementById('btn-hangar-back').addEventListener('click', () => showScreen('main-menu'));
+document.getElementById('btn-settings-back').addEventListener('click', () => {
+    saveData.settings.quality = document.getElementById('select-quality').value;
+    saveData.settings.volume = parseFloat(document.getElementById('range-volume').value);
+    setMasterVolume(saveData.settings.volume);
+    saveGameData(saveData);
+    showScreen('main-menu');
+});
+document.getElementById('btn-credits-back').addEventListener('click', () => showScreen('main-menu'));
+document.getElementById('btn-reset-data').addEventListener('click', () => {
+    if (confirm('Reset all saved progress and credits?')) {
+        saveData = resetGameData();
+        alert('Progress reset.');
+    }
+});
+
+document.getElementById('btn-launch-mission').addEventListener('click', () => {
+    startMission(currentMission);
+});
+
+document.getElementById('btn-pause').addEventListener('click', () => {
+    gameState = 'PAUSED';
+    showScreen('pause-menu');
+});
+document.getElementById('btn-resume').addEventListener('click', () => {
+    gameState = 'PLAYING';
+    showScreen('gameplay-hud');
+});
+document.getElementById('btn-restart').addEventListener('click', () => startMission(currentMission));
+document.getElementById('btn-quit').addEventListener('click', () => {
+    gameState = 'MENU';
+    showScreen('main-menu');
+});
+document.getElementById('btn-next-mission').addEventListener('click', () => {
+    if (currentMission < 3) {
+        currentMission++;
+        setupBriefing();
+    } else {
+        gameState = 'MENU';
+        showScreen('main-menu');
+    }
+});
+document.getElementById('btn-result-menu').addEventListener('click', () => {
+    gameState = 'MENU';
+    showScreen('main-menu');
+});
+
+// Check continue button availability
+if (saveData.unlockedMission > 1 || saveData.credits > 0) {
+    document.getElementById('btn-continue').style.display = 'block';
+}
+
+function setupBriefing() {
+    const titles = ["MISSION 1: FIRST CONTACT", "MISSION 2: ASTEROID SIEGE", "MISSION 3: THE DREADNOUGHT"];
+    const descs = [
+        "Engage hostile scout fighters and master fundamental flight controls.",
+        "Navigate asteroid hazards and destroy elite enemy formations.",
+        "Confront the massive dreadnought capital ship and defeat its core."
+    ];
+    document.getElementById('briefing-title').innerText = titles[currentMission - 1];
+    document.getElementById('briefing-desc').innerText = descs[currentMission - 1];
+    showScreen('mission-briefing');
+}
+
+function startMission(missionNum) {
+    gameState = 'PLAYING';
+    showScreen('gameplay-hud');
+    score = 0;
+    shield = 100;
+    boost = 100;
+    player.position.set(0, 0, 0);
+
+    // Clear old enemies
+    enemies.forEach(e => scene.remove(e.mesh));
+    enemies = [];
+    if (boss) {
+        scene.remove(boss);
+        boss = null;
+        document.getElementById('boss-hud').style.display = 'none';
     }
 
-    initEventListeners() {
-        document.getElementById('btn-start').addEventListener('click', () => {
-            audioManager.init();
-            this.currentMission = this.gameData.unlockedMission;
-            this.showBriefing();
-        });
-
-        document.getElementById('btn-launch').addEventListener('click', () => {
-            this.startMission(this.currentMission);
-        });
-
-        document.getElementById('btn-hangar').addEventListener('click', () => {
-            this.ui.showScreen('hangarScreen');
-            document.getElementById('player-credits').innerText = this.gameData.credits;
-        });
-
-        document.getElementById('btn-settings').addEventListener('click', () => { this.ui.showScreen('settingsScreen'); });
-        document.getElementById('btn-controls').addEventListener('click', () => { this.ui.showScreen('controlsScreen'); });
-        document.getElementById('btn-credits').addEventListener('click', () => { this.ui.showScreen('creditsScreen'); });
-
-        const backToMenu = () => { this.ui.showScreen('mainMenu'); };
-        document.getElementById('btn-back-menu').addEventListener('click', backToMenu);
-        document.getElementById('btn-hangar-back').addEventListener('click', backToMenu);
-        document.getElementById('btn-settings-back').addEventListener('click', backToMenu);
-        document.getElementById('btn-controls-back').addEventListener('click', backToMenu);
-        document.getElementById('btn-credits-back').addEventListener('click', backToMenu);
-        document.getElementById('btn-success-menu').addEventListener('click', backToMenu);
-        document.getElementById('btn-failure-menu').addEventListener('click', backToMenu);
-
-        document.getElementById('setting-volume').addEventListener('input', (e) => {
-            audioManager.setVolume(parseFloat(e.target.value));
-        });
-
-        document.getElementById('btn-pause').addEventListener('click', () => { this.pauseGame(); });
-        document.getElementById('btn-resume').addEventListener('click', () => { this.resumeGame(); });
-        document.getElementById('btn-restart').addEventListener('click', () => { this.startMission(this.currentMission); });
-
-        document.getElementById('btn-next-mission').addEventListener('click', () => {
-            this.currentMission++;
-            if (this.currentMission > 3) this.currentMission = 3;
-            this.showBriefing();
-        });
-    }
-
-    showBriefing() {
-        const titles = ["", "MISSION 1: FIRST CONTACT", "MISSION 2: ASTEROID SIEGE", "MISSION 3: THE DREADNOUGHT"];
-        const descs = [
-            "",
-            "Engage enemy scout units and master your interceptor controls in deep space sector Alpha.",
-            "Navigate heavy asteroid fields and eliminate hostile interceptor squadrons.",
-            "Confront the Capital Dreadnought flagship and destroy its core reactor."
-        ];
-        document.getElementById('briefing-title').innerText = titles[this.currentMission];
-        document.getElementById('briefing-desc').innerText = descs[this.currentMission];
-        this.ui.showScreen('missionBriefing');
-    }
-
-    startMission(missionNum) {
-        this.currentMission = missionNum;
-        this.score = 0;
-        this.player.reset();
-        this.enemies.clear();
-        this.boss.clear();
-
-        if (missionNum === 3) {
-            this.boss.spawn();
-            this.missionState = { enemiesDefeated: 0, targetCount: 1 };
-        } else {
-            this.missionState = { enemiesDefeated: 0, targetCount: 5 + missionNum * 2 };
-            for (let i = 0; i < 3; i++) {
-                this.enemies.spawnScout(new THREE.Vector3((Math.random() - 0.5) * 30, (Math.random() - 0.5) * 20, -60 - Math.random() * 40));
-            }
+    if (missionNum === 3) {
+        boss = createBossMesh();
+        boss.position.set(0, 0, -100);
+        scene.add(boss);
+        bossHP = 100;
+        document.getElementById('boss-hud').style.display = 'block';
+    } else {
+        // Spawn wave
+        for (let i = 0; i < 5 + missionNum * 2; i++) {
+            const mesh = createEnemyMesh(missionNum === 2 ? 'heavy' : 'scout');
+            mesh.position.set((Math.random() - 0.5) * 40, (Math.random() - 0.5) * 20, -50 - Math.random() * 50);
+            scene.add(mesh);
+            enemies.push({ mesh, hp: missionNum === 2 ? 3 : 1 });
         }
-
-        this.state = 'PLAYING';
-        this.ui.showScreen('gameHud');
-    }
-
-    pauseGame() {
-        if (this.state === 'PLAYING') {
-            this.state = 'PAUSED';
-            this.ui.showScreen('pauseMenu');
-        }
-    }
-
-    resumeGame() {
-        if (this.state === 'PAUSED') {
-            this.state = 'PLAYING';
-            this.ui.showScreen('gameHud');
-        }
-    }
-
-    lastTime = 0;
-    loop(time) {
-        requestAnimationFrame(this.loop);
-        const dt = Math.min(0.1, (time - this.lastTime) / 1000);
-        this.lastTime = time;
-
-        if (this.state === 'PLAYING') {
-            this.player.update(dt, this.input, this.spaceScene.camera);
-            this.weapons.update(dt);
-            this.particles.update(dt);
-
-            // Update fire cooldown timer
-            if (this.fireCooldown > 0) {
-                this.fireCooldown -= dt;
-            }
-
-            // Fire weapon with cooldown control
-            if (this.input.isFiring() && this.fireCooldown <= 0) {
-                this.weapons.fire(this.player.mesh.position.clone().add(new THREE.Vector3(0, 0, -2)), new THREE.Vector3(0, 0, -1));
-                this.fireCooldown = this.fireRateLimit;
-            }
-
-            if (this.currentMission === 3) {
-                const bossDefeated = this.boss.update(dt, this.player.mesh.position, this.weapons, this.particles);
-                if (bossDefeated) {
-                    this.state = 'SUCCESS';
-                    this.gameData.credits += 500;
-                    saveGameData(this.gameData);
-                    document.getElementById('summary-score').innerText = this.score;
-                    document.getElementById('summary-credits').innerText = '500';
-                    this.ui.showScreen('successScreen');
-                }
-            } else {
-                const res = this.enemies.update(dt, this.player.mesh.position, this.particles);
-                if (res.hitPlayer) {
-                    this.player.health -= res.damage;
-                    audioManager.playShieldHit();
-                }
-
-                if (this.enemies.enemies.length < 3 && this.missionState.enemiesDefeated < this.missionState.targetCount) {
-                    this.enemies.spawnScout(new THREE.Vector3((Math.random() - 0.5) * 30, (Math.random() - 0.5) * 20, -80));
-                }
-
-                // Check projectile collisions with enemies
-                for (let p of this.weapons.pool) {
-                    if (p.active && !p.isEnemy) {
-                        for (let i = this.enemies.enemies.length - 1; i >= 0; i--) {
-                            const e = this.enemies.enemies[i];
-                            if (p.mesh.position.distanceTo(e.mesh.position) < 2.0) {
-                                p.active = false;
-                                p.mesh.visible = false;
-                                e.health -= 25;
-                                if (e.health <= 0) {
-                                    this.particles.spawnExplosion(e.mesh.position, 0xff0055, 25);
-                                    audioManager.playExplosion();
-                                    this.spaceScene.scene.remove(e.mesh);
-                                    this.enemies.enemies.splice(i, 1);
-                                    this.score += 100;
-                                    this.missionState.enemiesDefeated++;
-                                }
-                            }
-                        }
-                    }
-                }
-
-                if (this.missionState.enemiesDefeated >= this.missionState.targetCount) {
-                    this.state = 'SUCCESS';
-                    this.gameData.credits += 250;
-                    if (this.currentMission >= this.gameData.unlockedMission) {
-                        this.gameData.unlockedMission = Math.min(3, this.currentMission + 1);
-                    }
-                    saveGameData(this.gameData);
-                    document.getElementById('summary-score').innerText = this.score;
-                    document.getElementById('summary-credits').innerText = '250';
-                    this.ui.showScreen('successScreen');
-                }
-            }
-
-            if (this.player.health <= 0) {
-                this.state = 'FAILURE';
-                this.particles.spawnExplosion(this.player.mesh.position, 0x00f0ff, 50);
-                audioManager.playExplosion();
-                this.ui.showScreen('failureScreen');
-            }
-
-            const objText = this.currentMission === 3 ? "Objective: Destroy Dreadnought Core" : `Objective: Eliminate Scouts (${this.missionState.enemiesDefeated}/${this.missionState.targetCount})`;
-            this.ui.updateHUD(this.player, this.score, objText, this.boss);
-        }
-
-        this.spaceScene.render();
     }
 }
 
-window.addEventListener('DOMContentLoaded', () => {
-    new Game();
+// Game Loop
+const clock = new THREE.Clock();
+let fireCooldown = 0;
+
+function animate() {
+    requestAnimationFrame(animate);
+    const delta = clock.getDelta();
+
+    if (gameState === 'PLAYING') {
+        // Player Movement
+        const speed = input.keys['ShiftLeft'] || input.keys['ShiftRight'] ? 30 : 15;
+        if (input.keys['KeyW'] || input.keys['ArrowUp']) player.position.y += speed * delta;
+        if (input.keys['KeyS'] || input.keys['ArrowDown']) player.position.y -= speed * delta;
+        if (input.keys['KeyA'] || input.keys['ArrowLeft']) player.position.x -= speed * delta;
+        if (input.keys['KeyD'] || input.keys['ArrowRight']) player.position.x += speed * delta;
+
+        // Touch control fallback
+        if (input.touch.active) {
+            player.position.x += input.touch.x * 20 * delta;
+            player.position.y += input.touch.y * 20 * delta;
+        }
+
+        // Firing
+        fireCooldown -= delta;
+        if ((input.keys['Space'] || input.touch.fire) && fireCooldown <= 0) {
+            weapons.fire(player.position.clone().add(new THREE.Vector3(0, 0, -1)), new THREE.Vector3(0, 0, -1), true);
+            playSound('laser');
+            fireCooldown = 0.2;
+        }
+
+        // Camera follow
+        camera.position.lerp(new THREE.Vector3(player.position.x, player.position.y + 3, player.position.z + 10), 0.1);
+        camera.lookAt(player.position.clone().add(new THREE.Vector3(0, 0, -5)));
+
+        // Update Systems
+        weapons.update(delta);
+        particles.update(delta);
+
+        // Enemy logic
+        for (let i = enemies.length - 1; i >= 0; i--) {
+            const en = enemies[i];
+            en.mesh.position.z += 10 * delta; // Move towards player
+
+            // Check collision with player
+            if (en.mesh.position.distanceTo(player.position) < 2) {
+                shield -= 25;
+                playSound('hit');
+                particles.createExplosion(en.mesh.position);
+                scene.remove(en.mesh);
+                enemies.splice(i, 1);
+                if (shield <= 0) endMission(false);
+                continue;
+            }
+
+            // Check collision with player projectiles
+            for (let j = weapons.projectiles.length - 1; j >= 0; j--) {
+                const proj = weapons.projectiles[j];
+                if (proj.isPlayer && proj.mesh.position.distanceTo(en.mesh.position) < 2) {
+                    en.hp--;
+                    scene.remove(proj.mesh);
+                    weapons.projectiles.splice(j, 1);
+                    playSound('hit');
+
+                    if (en.hp <= 0) {
+                        particles.createExplosion(en.mesh.position);
+                        scene.remove(en.mesh);
+                        enemies.splice(i, 1);
+                        score += 100;
+                    }
+                    break;
+                }
+            }
+        }
+
+        // Boss logic
+        if (boss) {
+            boss.position.z += 2 * delta;
+            for (let j = weapons.projectiles.length - 1; j >= 0; j--) {
+                const proj = weapons.projectiles[j];
+                if (proj.isPlayer && proj.mesh.position.distanceTo(boss.position) < 5) {
+                    bossHP -= 2;
+                    scene.remove(proj.mesh);
+                    weapons.projectiles.splice(j, 1);
+                    playSound('hit');
+                    document.getElementById('boss-hp-fill').style.width = `${bossHP}%`;
+
+                    if (bossHP <= 0) {
+                        particles.createExplosion(boss.position, 0xff0000);
+                        scene.remove(boss);
+                        boss = null;
+                        document.getElementById('boss-hud').style.display = 'none';
+                        endMission(true);
+                    }
+                    break;
+                }
+            }
+        }
+
+        // Check wave completion for missions 1 & 2
+        if (currentMission < 3 && enemies.length === 0) {
+            endMission(true);
+        }
+
+        updateHUD({ score, mission: currentMission, credits: saveData.credits, shield, boost });
+    }
+
+    renderer.render(scene, camera);
+}
+
+function endMission(success) {
+    gameState = 'RESULT';
+    const title = document.getElementById('result-title');
+    if (success) {
+        title.innerText = 'MISSION SUCCESS';
+        score += 500;
+        saveData.credits += 250;
+        if (currentMission >= saveData.unlockedMission && currentMission < 3) {
+            saveData.unlockedMission = currentMission + 1;
+        }
+        saveGameData(saveData);
+    } else {
+        title.innerText = 'MISSION FAILED';
+    }
+    document.getElementById('res-score').innerText = score;
+    document.getElementById('res-credits').innerText = success ? 250 : 0;
+    showScreen('result-screen');
+}
+
+// Window resizing
+window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
 });
+
+animate();
