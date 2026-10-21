@@ -1,3 +1,4 @@
+import * as THREE from 'three';
 import { SpaceScene } from './scene.js';
 import { PlayerShip } from './player.js';
 import { WeaponSystem } from './weapons.js';
