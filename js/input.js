@@ -1,18 +1,19 @@
-// Robust Input Manager for Keyboard and Touch Controls
+// Comprehensive Desktop & Mobile Input Manager for 3D Space Combat
 export class InputManager {
     constructor() {
         this.keys = {};
-        this.mouse = { x: 0, y: 0, down: false };
-        this.touch = { active: false, x: 0, y: 0, fire: false, boost: false };
-        this.isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        this.mouse = { x: 0, y: 0, firing: false };
+        this.touch = { active: false, x: 0, y: 0, firing: false, boosting: false };
 
-        this.initListeners();
+        this.initKeyboardListeners();
+        this.initMouseListeners();
     }
 
-    initListeners() {
+    initKeyboardListeners() {
         window.addEventListener('keydown', (e) => {
             this.keys[e.code] = true;
-            if (['Space', 'KeyW', 'KeyS', 'KeyA', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) {
+            // Prevent default scrolling on spacebar or arrow keys
+            if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) {
                 e.preventDefault();
             }
         });
@@ -20,85 +21,113 @@ export class InputManager {
         window.addEventListener('keyup', (e) => {
             this.keys[e.code] = false;
         });
+    }
 
+    initMouseListeners() {
         window.addEventListener('mousedown', (e) => {
-            if (e.button === 0) this.mouse.down = true;
+            if (e.button === 0) this.mouse.firing = true;
         });
 
         window.addEventListener('mouseup', (e) => {
-            if (e.button === 0) this.mouse.down = false;
-        });
-
-        window.addEventListener('mousemove', (e) => {
-            this.mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
-            this.mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+            if (e.button === 0) this.mouse.firing = false;
         });
     }
 
-    setupTouchControls(domElement) {
-        if (!this.isMobile && window.innerWidth > 900) return;
-        const container = document.getElementById('touch-controls');
-        if (container) container.style.display = 'block';
-
+    setupTouchControls(container) {
         const joystick = document.getElementById('virtual-joystick');
         const knob = document.getElementById('joystick-knob');
-        let joyCenter = { x: 0, y: 0 };
+        const fireBtn = document.getElementById('touch-fire');
+        const boostBtn = document.getElementById('touch-boost');
+
+        if (!joystick || !knob) return;
+
+        let joystickCenter = { x: 0, y: 0 };
+        let touchId = null;
 
         joystick.addEventListener('touchstart', (e) => {
-            const touch = e.touches[0];
+            e.preventDefault();
+            const touch = e.changedTouches[0];
+            touchId = touch.identifier;
             const rect = joystick.getBoundingClientRect();
-            joyCenter = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+            joystickCenter = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
             this.touch.active = true;
-        });
+        }, { passive: false });
 
         joystick.addEventListener('touchmove', (e) => {
-            const touch = e.touches[0];
-            const dx = touch.clientX - joyCenter.x;
-            const dy = touch.clientY - joyCenter.y;
-            const dist = Math.min(50, Math.sqrt(dx * dx + dy * dy));
-            const angle = Math.atan2(dy, dx);
-
-            knob.style.transform = `translate(${Math.cos(angle) * dist}px, ${Math.sin(angle) * dist}px)`;
-            this.touch.x = (Math.cos(angle) * dist) / 50;
-            this.touch.y = -(Math.sin(angle) * dist) / 50;
             e.preventDefault();
-        });
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                const touch = e.changedTouches[i];
+                if (touch.identifier === touchId) {
+                    const dx = touch.clientX - joystickCenter.x;
+                    const dy = touch.clientY - joystickCenter.y;
+                    const dist = Math.min(50, Math.sqrt(dx * dx + dy * dy));
+                    const angle = Math.atan2(dy, dx);
 
-        joystick.addEventListener('touchend', () => {
-            this.touch.active = false;
-            this.touch.x = 0;
-            this.touch.y = 0;
-            knob.style.transform = `translate(0px, 0px)`;
-        });
+                    const clampedX = Math.cos(angle) * dist;
+                    const clampedY = Math.sin(angle) * dist;
 
-        const fireBtn = document.getElementById('touch-fire');
-        fireBtn.addEventListener('touchstart', () => { this.touch.fire = true; });
-        fireBtn.addEventListener('touchend', () => { this.touch.fire = false; });
+                    knob.style.transform = `translate(${clampedX}px, ${clampedY}px)`;
+                    this.touch.x = clampedX / 50;
+                    this.touch.y = -clampedY / 50; // Invert Y for flight controls
+                }
+            }
+        }, { passive: false });
 
-        const boostBtn = document.getElementById('touch-boost');
-        boostBtn.addEventListener('touchstart', () => { this.touch.boost = true; });
-        boostBtn.addEventListener('touchend', () => { this.touch.boost = false; });
+        const endTouch = (e) => {
+            e.preventDefault();
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                if (e.changedTouches[i].identifier === touchId) {
+                    touchId = null;
+                    this.touch.active = false;
+                    this.touch.x = 0;
+                    this.touch.y = 0;
+                    knob.style.transform = `translate(0px, 0px)`;
+                }
+            }
+        };
+
+        joystick.addEventListener('touchend', endTouch, { passive: false });
+        joystick.addEventListener('touchcancel', endTouch, { passive: false });
+
+        if (fireBtn) {
+            fireBtn.addEventListener('touchstart', (e) => { e.preventDefault(); this.touch.firing = true; }, { passive: false });
+            fireBtn.addEventListener('touchend', (e) => { e.preventDefault(); this.touch.firing = false; }, { passive: false });
+        }
+
+        if (boostBtn) {
+            boostBtn.addEventListener('touchstart', (e) => { e.preventDefault(); this.touch.boosting = true; }, { passive: false });
+            boostBtn.addEventListener('touchend', (e) => { e.preventDefault(); this.touch.boosting = false; }, { passive: false });
+        }
+    }
+
+    getMovementVector() {
+        let x = 0;
+        let y = 0;
+
+        // Keyboard Controls (WASD / Arrow Keys)
+        if (this.keys['KeyA'] || this.keys['ArrowLeft']) x -= 1;
+        if (this.keys['KeyD'] || this.keys['ArrowRight']) x += 1;
+        if (this.keys['KeyW'] || this.keys['ArrowUp']) y += 1;
+        if (this.keys['KeyS'] || this.keys['ArrowDown']) y -= 1;
+
+        // Override or combine with Touch Joystick if active
+        if (this.touch.active) {
+            x = this.touch.x;
+            y = this.touch.y;
+        }
+
+        return { x, y };
     }
 
     isFiring() {
-        return this.keys['Space'] || this.mouse.down || this.touch.fire;
+        return !!(this.keys['Space'] || this.mouse.firing || this.touch.firing);
     }
 
     isBoosting() {
-        return this.keys['ShiftLeft'] || this.keys['ShiftRight'] || this.touch.boost;
+        return !!(this.keys['ShiftLeft'] || this.keys['ShiftRight'] || this.touch.boosting);
     }
 
-    getAxis(axis) {
-        let val = 0;
-        if (axis === 'horizontal') {
-            if (this.keys['KeyA'] || this.keys['ArrowLeft']) val -= 1;
-            if (this.keys['KeyD'] || this.keys['ArrowRight']) val += 1;
-            if (this.touch.active) val += this.touch.x;
-        } else if (axis === 'vertical') {
-            if (this.keys['KeyW'] || this.keys['ArrowUp']) val += 1;
-            if (this.keys['KeyS'] || this.keys['ArrowDown']) val -= 1;
-            if (this.touch.active) val += this.touch.y;
-        }
-        return Math.max(-1, Math.min(1, val));
+    isSecondaryPressed() {
+        return !!(this.keys['KeyQ'] || this.keys['KeyE']);
     }
 }
