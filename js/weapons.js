@@ -3,75 +3,36 @@ import * as THREE from 'three';
 export class WeaponSystem {
     constructor(scene) {
         this.scene = scene;
-        this.pool = [];
-        this.poolSize = 50;
-
-        // Initialize Projectile Pool
-        for (let i = 0; i < this.poolSize; i++) {
-            const geo = new THREE.CylinderGeometry(0.15, 0.15, 2.5, 8);
-            geo.rotateX(Math.PI / 2);
-            const mat = new THREE.MeshBasicMaterial({ color: 0x00f0ff });
-            const mesh = new THREE.Mesh(geo, mat);
-            mesh.visible = false;
-            this.scene.add(mesh);
-
-            this.pool.push({
-                mesh: mesh,
-                active: false,
-                position: new THREE.Vector3(),
-                velocity: new THREE.Vector3(),
-                isEnemy: false,
-                type: 'rapid'
-            });
-        }
+        this.projectiles = [];
+        this.geo = new THREE.CylinderGeometry(0.08, 0.08, 1.5, 6);
+        this.geo.rotateX(Math.PI / 2);
+        this.mat = new THREE.MeshBasicMaterial({ color: 0x00ffff });
     }
 
-    fire(pos, dir, weaponType = 'rapid') {
-        // Find inactive projectile in pool
-        for (let p of this.pool) {
-            if (!p.active) {
-                p.active = true;
-                p.mesh.visible = true;
-                p.mesh.position.copy(pos);
-                p.type = weaponType;
-                p.isEnemy = false;
-
-                let speed = 120;
-                let color = 0x00f0ff;
-                let scaleX = 1, scaleY = 1, scaleZ = 1;
-
-                if (weaponType === 'heavy') {
-                    speed = 85;
-                    color = 0xff5500;
-                    scaleX = 2.5; scaleY = 2.5; scaleZ = 3.5;
-                } else if (weaponType === 'missile') {
-                    speed = 60;
-                    color = 0x00ffaa;
-                    scaleX = 1.5; scaleY = 1.5; scaleZ = 2.0;
-                } else if (weaponType === 'nova') {
-                    speed = 100;
-                    color = 0xff0080;
-                    scaleX = 3.0; scaleY = 3.0; scaleZ = 3.0;
-                }
-
-                p.mesh.scale.set(scaleX, scaleY, scaleZ);
-                p.mesh.material.color.setHex(color);
-                p.velocity.copy(dir).normalize().multiplyScalar(speed);
-                break;
-            }
-        }
+    fire(position, direction, isPlayer = true) {
+        const mesh = new THREE.Mesh(this.geo, this.mat.clone());
+        if (!isPlayer) mesh.material.color.setHex(0xff3300);
+        mesh.position.copy(position);
+        
+        this.scene.add(mesh);
+        this.projectiles.push({
+            mesh,
+            direction,
+            speed: isPlayer ? 80 : 40,
+            isPlayer,
+            life: 3.0
+        });
     }
 
-    update(dt) {
-        for (let p of this.pool) {
-            if (p.active) {
-                p.mesh.position.addScaledVector(p.velocity, dt);
+    update(delta) {
+        for (let i = this.projectiles.length - 1; i >= 0; i--) {
+            const p = this.projectiles[i];
+            p.mesh.position.addScaledVector(p.direction, p.speed * delta);
+            p.life -= delta;
 
-                // Deactivate if out of range
-                if (p.mesh.position.z < -1500 || Math.abs(p.mesh.position.x) > 100 || Math.abs(p.mesh.position.y) > 80) {
-                    p.active = false;
-                    p.mesh.visible = false;
-                }
+            if (p.life <= 0) {
+                this.scene.remove(p.mesh);
+                this.projectiles.splice(i, 1);
             }
         }
     }
