@@ -21,7 +21,7 @@ const particles = new ParticleSystem(scene);
 const cinematic = new CinematicSequence(camera, player, () => startGameplay());
 
 let gameState = 'MENU'; // MENU, CINEMATIC, PLAYING, PAUSED, OVER
-let cameraMode = 'COMBAT'; // EXPLORATION or COMBAT
+let cameraMode = 'COMBAT';
 let score = 0;
 let health = 100;
 let boost = 100;
@@ -30,32 +30,47 @@ let enemies = [];
 let boss = null;
 let bossHP = 100;
 let fireCooldown = 0;
-let isMouseDown = false;
+let isFiringTriggered = false;
 
-const keys = {};
+// Global Key Listeners
 window.addEventListener('keydown', e => {
-    keys[e.code] = true;
-    if (e.code === 'Space') e.preventDefault(); // Prevent page scrolling or button re-triggering
+    if (e.code === 'Space' || e.code === 'KeyF') {
+        e.preventDefault();
+        isFiringTriggered = true;
+    }
     if (e.code === 'KeyC' && gameState === 'PLAYING') {
         cameraMode = cameraMode === 'COMBAT' ? 'EXPLORATION' : 'COMBAT';
         document.getElementById('hud-cam-mode').innerText = cameraMode;
     }
     if (e.code === 'Escape' && gameState === 'PLAYING') togglePause();
 });
-window.addEventListener('keyup', e => keys[e.code] = false);
 
-// Mouse and Touch Firing Support
-window.addEventListener('mousedown', () => { isMouseDown = true; });
-window.addEventListener('mouseup', () => { isMouseDown = false; });
+window.addEventListener('keyup', e => {
+    if (e.code === 'Space' || e.code === 'KeyF') {
+        isFiringTriggered = false;
+    }
+});
 
-// UI Listeners with Focus Blur Fix
+// Pointer / Mouse Listeners
+window.addEventListener('pointerdown', (e) => {
+    // Canvas par click ho tabhi attack/fire register ho (Menu UI buttons bypass)
+    if (e.target.tagName !== 'BUTTON' && gameState === 'PLAYING') {
+        isFiringTriggered = true;
+    }
+});
+
+window.addEventListener('pointerup', () => {
+    isFiringTriggered = false;
+});
+
+// UI Event Listeners
 document.getElementById('btn-start').addEventListener('click', (e) => {
-    e.target.blur();
+    if (e && e.target) e.target.blur();
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
     startGameplay();
 });
 document.getElementById('btn-cinematic').addEventListener('click', (e) => {
-    e.target.blur();
+    if (e && e.target) e.target.blur();
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
     gameState = 'CINEMATIC';
     cinematic.start();
@@ -107,13 +122,13 @@ function spawnWave() {
     }
     for (let i = 0; i < 4 + wave * 2; i++) {
         const mesh = createEnemyMesh(wave === 3 ? 'heavy' : 'scout');
-        mesh.position.set((Math.random() - 0.5) * 45, (Math.random() - 0.5) * 25, -60 - Math.random() * 40);
+        mesh.position.set((Math.random() - 0.5) * 40, (Math.random() - 0.5) * 20, -50 - Math.random() * 40);
         scene.add(mesh);
         enemies.push({ mesh, hp: wave === 3 ? 3 : 1 });
     }
 }
 
-// Main Render & Simulation Loop
+// Game Animation Loop
 const clock = new THREE.Clock();
 
 function animate() {
@@ -125,26 +140,17 @@ function animate() {
     if (gameState === 'CINEMATIC') {
         cinematic.update(delta);
     } else if (gameState === 'PLAYING') {
-        // Ship Flight Controls (WASD / Arrows)
-        const speed = (keys['ShiftLeft'] || keys['ShiftRight']) && boost > 0 ? 35 : 18;
-        if (keys['ShiftLeft'] || keys['ShiftRight']) boost = Math.max(0, boost - delta * 25);
-        else boost = Math.min(100, boost + delta * 15);
-
-        if (keys['KeyW'] || keys['ArrowUp']) player.position.y += speed * delta;
-        if (keys['KeyS'] || keys['ArrowDown']) player.position.y -= speed * delta;
-        if (keys['KeyA'] || keys['ArrowLeft']) { player.position.x -= speed * delta; player.rotation.z = 0.3; }
-        else if (keys['KeyD'] || keys['ArrowRight']) { player.position.x += speed * delta; player.rotation.z = -0.3; }
-        else { player.rotation.z *= 0.9; }
-
-        // Firing Logic (Spacebar, 'F' key, or Mouse Click)
+        // Attack Execution Logic
         fireCooldown -= delta;
-        if ((keys['Space'] || keys['KeyF'] || isMouseDown) && fireCooldown <= 0) {
-            weapons.fire(player.position.clone().add(new THREE.Vector3(0, 0, -1)), new THREE.Vector3(0, 0, -1), true);
+        if (isFiringTriggered && fireCooldown <= 0) {
+            console.log("FIRING LASER!");
+            const spawnPos = player.position.clone().add(new THREE.Vector3(0, 0, -1.5));
+            weapons.fire(spawnPos, new THREE.Vector3(0, 0, -1), true);
             playSound('laser');
             fireCooldown = 0.15;
         }
 
-        // Smooth Camera Modes
+        // Camera Follow
         if (cameraMode === 'COMBAT') {
             camera.position.lerp(new THREE.Vector3(player.position.x * 0.5, player.position.y + 2.5, player.position.z + 8), 0.15);
             camera.lookAt(player.position.clone().add(new THREE.Vector3(0, 0, -10)));
@@ -156,12 +162,12 @@ function animate() {
         weapons.update(delta);
         particles.update(delta);
 
-        // Enemy Logic & Collisions
+        // Enemy Movement & Hit Detection
         for (let i = enemies.length - 1; i >= 0; i--) {
             const en = enemies[i];
-            en.mesh.position.z += 12 * delta;
+            en.mesh.position.z += 10 * delta;
 
-            if (en.mesh.position.distanceTo(player.position) < 2.2) {
+            if (en.mesh.position.distanceTo(player.position) < 2.5) {
                 health -= 25;
                 particles.createExplosion(en.mesh.position, 0xff0044);
                 scene.remove(en.mesh);
@@ -173,7 +179,7 @@ function animate() {
 
             for (let j = weapons.projectiles.length - 1; j >= 0; j--) {
                 const p = weapons.projectiles[j];
-                if (p.isPlayer && p.mesh.position.distanceTo(en.mesh.position) < 2.0) {
+                if (p.isPlayer && p.mesh.position.distanceTo(en.mesh.position) < 3.5) {
                     en.hp--;
                     scene.remove(p.mesh);
                     weapons.projectiles.splice(j, 1);
@@ -190,10 +196,10 @@ function animate() {
         }
 
         if (boss) {
-            boss.position.z += 3 * delta;
+            boss.position.z += 2.5 * delta;
             for (let j = weapons.projectiles.length - 1; j >= 0; j--) {
                 const p = weapons.projectiles[j];
-                if (p.isPlayer && p.mesh.position.distanceTo(boss.position) < 6.0) {
+                if (p.isPlayer && p.mesh.position.distanceTo(boss.position) < 7.0) {
                     bossHP -= 2;
                     scene.remove(p.mesh);
                     weapons.projectiles.splice(j, 1);
@@ -215,7 +221,7 @@ function animate() {
             spawnWave();
         }
 
-        // HUD Updates
+        // HUD Sync
         document.getElementById('hud-score').innerText = score;
         document.getElementById('hud-wave').innerText = wave <= 3 ? wave : 'BOSS';
         document.getElementById('player-hp').style.width = `${Math.max(0, health)}%`;
