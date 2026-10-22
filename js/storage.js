@@ -1,30 +1,16 @@
-const SAVE_KEY = 'cosmic_strike_save_v1';
-
-export function loadGameData() {
-    const defaultData = {
-        credits: 0,
-        unlockedMission: 1,
-        upgrades: { laser: 0, shield: 0, boost: 0 },
-        settings: { quality: 'medium', volume: 0.5 }
-    };
+const KEY = 'cosmic_strike_cinematic_v1';
+export function loadSave() {
     try {
-        const data = localStorage.getItem(SAVE_KEY);
-        return data ? { ...defaultData, ...JSON.parse(data) } : defaultData;
-    } catch (e) {
-        console.warn('Failed to load save data, using defaults.', e);
-        return defaultData;
-    }
+        const d = localStorage.getItem(KEY);
+        return d ? JSON.parse(d) : { highScore: 0 };
+    } catch (e) { return { highScore: 0 }; }
 }
-
-export function saveGameData(data) {
+export function saveScore(score) {
     try {
-        localStorage.setItem(SAVE_KEY, JSON.stringify(data));
-    } catch (e) {
-        console.warn('Failed to save game data.', e);
-    }
-}
-
-export function resetGameData() {
-    localStorage.removeItem(SAVE_KEY);
-    return loadGameData();
+        const d = loadSave();
+        if (score > d.highScore) {
+            d.highScore = score;
+            localStorage.setItem(KEY, JSON.stringify(d));
+        }
+    } catch (e) {}
 }
