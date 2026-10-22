@@ -2,13 +2,12 @@ import * as THREE from 'three';
 
 export function createEnemyMesh(type = 'scout') {
     const group = new THREE.Group();
-    const geo = new THREE.BoxGeometry(1.2, 0.6, 1.8);
+    const geo = new THREE.BoxGeometry(1.4, 0.7, 2.0);
     const mat = new THREE.MeshStandardMaterial({ 
-        color: type === 'heavy' ? 0xff4400 : 0xff0055, 
-        metalness: 0.6, 
-        roughness: 0.3 
+        color: type === 'heavy' ? 0xff5500 : 0xff0066, 
+        metalness: 0.8, 
+        roughness: 0.2 
     });
-    const mesh = new THREE.Mesh(geo, mat);
-    group.add(mesh);
+    group.add(new THREE.Mesh(geo, mat));
     return group;
 }
