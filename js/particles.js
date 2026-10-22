@@ -6,22 +6,21 @@ export class ParticleSystem {
         this.particles = [];
     }
 
-    createExplosion(pos, color = 0xffaa00) {
-        const count = 15;
-        for (let i = 0; i < count; i++) {
-            const geo = new THREE.BoxGeometry(0.2, 0.2, 0.2);
+    createExplosion(pos, color = 0x00ffff) {
+        for (let i = 0; i < 18; i++) {
+            const geo = new THREE.BoxGeometry(0.25, 0.25, 0.25);
             const mat = new THREE.MeshBasicMaterial({ color });
             const mesh = new THREE.Mesh(geo, mat);
             mesh.position.copy(pos);
 
             const velocity = new THREE.Vector3(
-                (Math.random() - 0.5) * 15,
-                (Math.random() - 0.5) * 15,
-                (Math.random() - 0.5) * 15
+                (Math.random() - 0.5) * 20,
+                (Math.random() - 0.5) * 20,
+                (Math.random() - 0.5) * 20
             );
 
             this.scene.add(mesh);
-            this.particles.push({ mesh, velocity, life: 0.8 });
+            this.particles.push({ mesh, velocity, life: 0.7 });
         }
     }
 
