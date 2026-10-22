@@ -30,10 +30,12 @@ let enemies = [];
 let boss = null;
 let bossHP = 100;
 let fireCooldown = 0;
+let isMouseDown = false;
 
 const keys = {};
 window.addEventListener('keydown', e => {
     keys[e.code] = true;
+    if (e.code === 'Space') e.preventDefault(); // Prevent page scrolling or button re-triggering
     if (e.code === 'KeyC' && gameState === 'PLAYING') {
         cameraMode = cameraMode === 'COMBAT' ? 'EXPLORATION' : 'COMBAT';
         document.getElementById('hud-cam-mode').innerText = cameraMode;
@@ -42,12 +44,18 @@ window.addEventListener('keydown', e => {
 });
 window.addEventListener('keyup', e => keys[e.code] = false);
 
-// UI Listeners
-document.getElementById('btn-start').addEventListener('click', () => {
+// Mouse and Touch Firing Support
+window.addEventListener('mousedown', () => { isMouseDown = true; });
+window.addEventListener('mouseup', () => { isMouseDown = false; });
+
+// UI Listeners with Focus Blur Fix
+document.getElementById('btn-start').addEventListener('click', (e) => {
+    e.target.blur();
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
     startGameplay();
 });
-document.getElementById('btn-cinematic').addEventListener('click', () => {
+document.getElementById('btn-cinematic').addEventListener('click', (e) => {
+    e.target.blur();
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
     gameState = 'CINEMATIC';
     cinematic.start();
@@ -117,7 +125,7 @@ function animate() {
     if (gameState === 'CINEMATIC') {
         cinematic.update(delta);
     } else if (gameState === 'PLAYING') {
-        // Ship Flight Controls
+        // Ship Flight Controls (WASD / Arrows)
         const speed = (keys['ShiftLeft'] || keys['ShiftRight']) && boost > 0 ? 35 : 18;
         if (keys['ShiftLeft'] || keys['ShiftRight']) boost = Math.max(0, boost - delta * 25);
         else boost = Math.min(100, boost + delta * 15);
@@ -128,12 +136,12 @@ function animate() {
         else if (keys['KeyD'] || keys['ArrowRight']) { player.position.x += speed * delta; player.rotation.z = -0.3; }
         else { player.rotation.z *= 0.9; }
 
-        // Firing
+        // Firing Logic (Spacebar, 'F' key, or Mouse Click)
         fireCooldown -= delta;
-        if ((keys['Space'] || keys['KeyF']) && fireCooldown <= 0) {
+        if ((keys['Space'] || keys['KeyF'] || isMouseDown) && fireCooldown <= 0) {
             weapons.fire(player.position.clone().add(new THREE.Vector3(0, 0, -1)), new THREE.Vector3(0, 0, -1), true);
             playSound('laser');
-            fireCooldown = 0.18;
+            fireCooldown = 0.15;
         }
 
         // Smooth Camera Modes
@@ -189,7 +197,7 @@ function animate() {
                     bossHP -= 2;
                     scene.remove(p.mesh);
                     weapons.projectiles.splice(j, 1);
-                    document.getElementById('boss-hp').style.width = `\${bossHP}%`;
+                    document.getElementById('boss-hp').style.width = `${bossHP}%`;
                     if (bossHP <= 0) {
                         particles.createExplosion(boss.position, 0xff0000);
                         scene.remove(boss);
@@ -210,7 +218,8 @@ function animate() {
         // HUD Updates
         document.getElementById('hud-score').innerText = score;
         document.getElementById('hud-wave').innerText = wave <= 3 ? wave : 'BOSS';
-        document.getElementById('player-hp').style.width = `${Math.max(0, health)}\%`; document.getElementById('player-boost').style.width = `${Math.max(0, boost)}%`;
+        document.getElementById('player-hp').style.width = `${Math.max(0, health)}%`;
+        document.getElementById('player-boost').style.width = `${Math.max(0, boost)}%`;
     }
 
     renderer.render(scene, camera);
